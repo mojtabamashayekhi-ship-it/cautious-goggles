@@ -3,11 +3,11 @@ services:
     name: aihr40bot
     env: python
     plan: free
-    region: frankfurt  # یا oregon
-    buildCommand: "pip install -r requirements.txt"
+    region: frankfurt
+    buildCommand: "pip install --no-deps -r requirements.txt"
     startCommand: "gunicorn app:app"
     envVars:
       - key: BOT_TOKEN
         sync: false
-        value: "1820733597:aCi2zuJ6nHm38iK71HxZyzPXOlQ1Jd55fgY"  # ⚠️ بعداً اینجا را حذف کنید!
+        value: "1820733597:aCi2zuJ6nHm38iK71HxZyzPXOlQ1Jd55fgY"
     healthCheckPath: /health
