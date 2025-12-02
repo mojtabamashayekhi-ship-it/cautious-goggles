@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: aihr40bot
+    env: python
+    plan: free
+    region: frankfurt  # یا oregon
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+        value: "1820733597:aCi2zuJ6nHm38iK71HxZyzPXOlQ1Jd55fgY"  # ⚠️ بعداً در Render امن کنید
+    healthCheckPath: /health
