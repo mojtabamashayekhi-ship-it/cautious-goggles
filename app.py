@@ -6,20 +6,19 @@ import os
 import re
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg')  # برای اجرا در محیط بدون GUI
 import matplotlib.pyplot as plt
 from bidi.algorithm import get_display
 import arabic_reshaper
-import random
 
-# ─── تنظیمات ───────────────────────────────────────
+# ─── تنظیمات از متغیرهای محیطی ──────────────────────────────────────
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "1820733597:aCi2zuJ6nHm38iK71HxZyzPXOlQ1Jd55fgY")
 BASE_URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}"
 QUESTIONS_FILE = "questions_hr_350_clean.json"
 
 app = Flask(__name__)
 
-# ─── بارگذاری سؤالات ──────────────────────────────────
+# ─── بارگذاری سؤالات ────────────────────────────────────────────────
 def load_questions():
     if not os.path.exists(QUESTIONS_FILE):
         return []
@@ -27,17 +26,19 @@ def load_questions():
         with open(QUESTIONS_FILE, "r", encoding="utf-8-sig") as f:
             data = f.read().strip()
             return json.loads(data) if data else []
-    except:
+    except Exception as e:
+        print(f"❌ خطای بارگذاری سوالات: {e}")
         return []
 
-# ─── نرمال‌سازی متن ───────────────────────────────────
+# ─── نرمال‌سازی متن ────────────────────────────────────────────────
 def clean(text):
     if not isinstance(text, str): return ""
     text = re.sub(r"[؟?!.,:;(){}[\]\"\'\-_]", " ", text.lower())
     text = re.sub(r"\s+", " ", text).strip()
-    return text.replace("آ", "ا").replace("ی", "ي").replace("ک", "ك")
+    text = text.replace("آ", "ا").replace("ی", "ي").replace("ک", "ك")
+    return text
 
-# ─── جستجوی فازی ───────────────────────────────────────
+# ─── جستجوی هوشمند ────────────────────────────────────────────────
 def find_matches(query, questions):
     if not query.strip(): return []
     q_clean = clean(query)
@@ -56,83 +57,11 @@ def find_matches(query, questions):
     matches.sort(key=lambda x: (-x[0], x[1]))
     return [item for _, _, item in matches]
 
-# ─── تولید تصویر جدول ──────────────────────────────────
-def create_table_image(data, title="جدول"):
-    try:
-        def fix_arabic(text):
-            if isinstance(text, str):
-                reshaped = arabic_reshaper.reshape(text)
-                return get_display(reshaped)
-            return text
-        
-        df = pd.DataFrame(data)
-        for col in df.columns:
-            df[col] = df[col].apply(fix_arabic)
-        cols = [fix_arabic(col) for col in df.columns]
+# ─── تشخیص درخواست جدول ────────────────────────────────────────────
+def is_image_table_request(text):
+    return any(kw in text for kw in ["تصویر جدول", "عکس جدول"]) and "شرایط نامساعد کار" in text
 
-        plt.rcParams.update({
-            "figure.dpi": 150,
-            "savefig.dpi": 150,
-            "font.family": "DejaVu Sans",
-        })
-
-        fig, ax = plt.subplots(figsize=(10, max(4, len(data) * 0.7)))
-        ax.axis('off')
-        table = ax.table(
-            cellText=df.values,
-            colLabels=cols,
-            cellLoc='center',
-            loc='center',
-            colColours=['#2E7D32'] * len(df.columns),
-            cellColours=[['#F5F5F5'] * len(df.columns)] * len(df)
-        )
-        table.auto_set_font_size(False)
-        table.set_fontsize(9)
-        table.scale(1.1, 2.0)
-
-        if "(" in title and ")" in title:
-            parts = title.split("(", 1)
-            eng = parts[0].strip()
-            per = parts[1].split(")", 1)[0].strip()
-            final_title = f"{fix_arabic(per)} ({eng})"
-        else:
-            final_title = fix_arabic(title)
-        ax.set_title(final_title, fontsize=12, pad=15, fontweight='bold', color='#1B5E20')
-
-        filename = f"table_{random.randint(1000, 9999)}.png"
-        plt.savefig(filename, bbox_inches='tight', facecolor='white', dpi=150)
-        plt.close()
-        return filename if os.path.exists(filename) and os.path.getsize(filename) > 1000 else None
-    except:
-        return None
-
-# ─── ارسال تصویر به بله ─────────────────────────────────
-def send_table_image(chat_id, caption=""):
-    data = [
-        {"Job Title (عنوان شغل)": "کارشناس اداری", "Normal Duty (عادی)": "2200", "Full Time (مداوم)": "2200"},
-        {"Job Title (عنوان شغل)": "آتش‌نشان", "Normal Duty (عادی)": "2700", "Full Time (مداوم)": "3000"},
-        {"Job Title (عنوان شغل)": "نگهبان", "Normal Duty (عادی)": "2700", "Full Time (مداوم)": "3000"},
-        {"Job Title (عنوان شغل)": "رانندهٔ خودروی سنگین", "Normal Duty (عادی)": "2500", "Full Time (مداوم)": "2800"},
-    ]
-    img_path = create_table_image(data, title="Working Conditions Table (شرایط نامساعد کار)")
-    if not img_path:
-        return False
-    try:
-        with open(img_path, 'rb') as f:
-            res = requests.post(
-                f"{BASE_URL}/sendPhoto",
-                data={"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"},
-                files={"photo": f},
-                timeout=30
-            )
-        os.remove(img_path)
-        return res.ok
-    except:
-        if os.path.exists(img_path):
-            os.remove(img_path)
-        return False
-
-# ─── تولید پاسخ متنی ───────────────────────────────────
+# ─── تولید پاسخ ────────────────────────────────────────────────────
 def make_answer(items):
     if not items:
         return "لطفاً سؤال مرتبط با «کتاب مجموعه ضوابط طرح طبقه‌بندی مشاغل» طرح نمایید."
@@ -154,7 +83,83 @@ def make_answer(items):
         )
     return result.strip()
 
-# ─── Endpoint اصلی webhook ───────────────────────────────
+# ─── تولید تصویر جدول ──────────────────────────────────────────────
+def create_table_image(data, title="جدول"):
+    try:
+        def fix_arabic(text):
+            if isinstance(text, str):
+                reshaped = arabic_reshaper.reshape(text)
+                return get_display(reshaped)
+            return text
+        df = pd.DataFrame(data)
+        for col in df.columns:
+            df[col] = df[col].apply(fix_arabic)
+        cols = [fix_arabic(col) for col in df.columns]
+        plt.rcParams.update({
+            "figure.dpi": 150,
+            "savefig.dpi": 150,
+            "font.family": "DejaVu Sans",
+        })
+        fig, ax = plt.subplots(figsize=(10, max(4, len(data) * 0.7)))
+        ax.axis('tight')
+        ax.axis('off')
+        table = ax.table(
+            cellText=df.values,
+            colLabels=cols,
+            cellLoc='center',
+            loc='center',
+            colColours=['#2E7D32'] * len(df.columns),
+            cellColours=[['#F5F5F5'] * len(df.columns)] * len(df)
+        )
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1.1, 2.0)
+        if "(" in title and ")" in title:
+            parts = title.split("(", 1)
+            eng = parts[0].strip()
+            per = parts[1].split(")", 1)[0].strip()
+            final_title = f"{fix_arabic(per)} ({eng})"
+        else:
+            final_title = fix_arabic(title)
+        ax.set_title(final_title, fontsize=12, pad=15, fontweight='bold', color='#1B5E20')
+        filename = f"table_{int(time.time())}.png"
+        plt.savefig(filename, bbox_inches='tight', facecolor='white', dpi=150)
+        plt.close()
+        if os.path.exists(filename) and os.path.getsize(filename) > 1000:
+            return filename
+        else:
+            if os.path.exists(filename):
+                os.remove(filename)
+    except Exception as e:
+        print(f"❌ خطا در ایجاد تصویر جدول: {e}")
+    return None
+
+# ─── ارسال تصویر ──────────────────────────────────────────────────
+def send_table_image(chat_id, caption=""):
+    data = [
+        {"Job Title (عنوان شغل)": "کارشناس اداری", "Normal Duty (عادی)": "2200", "Full Time (مداوم)": "2200"},
+        {"Job Title (عنوان شغل)": "آتش‌نشان", "Normal Duty (عادی)": "2700", "Full Time (مداوم)": "3000"},
+        {"Job Title (عنوان شغل)": "نگهبان", "Normal Duty (عادی)": "2700", "Full Time (مداوم)": "3000"},
+        {"Job Title (عنوان شغل)": "رانندهٔ خودروی سنگین", "Normal Duty (عادی)": "2500", "Full Time (مداوم)": "2800"},
+    ]
+    img_path = create_table_image(data, title="Working Conditions Table (شرایط نامساعد کار)")
+    if not img_path:
+        return False
+    try:
+        with open(img_path, 'rb') as f:
+            res = requests.post(
+                f"{BASE_URL}/sendPhoto",
+                data={"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"},
+                files={"photo": f},
+                timeout=30
+            )
+        os.remove(img_path)
+        return res.ok
+    except Exception as e:
+        print(f"❌ خطا در ارسال تصویر: {e}")
+        return False
+
+# ─── endpoint اصلی webhook ────────────────────────────────────────
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
@@ -169,8 +174,8 @@ def webhook():
         if not text:
             return jsonify({"ok": True})
 
-        # درخواست تصویر جدول
-        if ("تصویر جدول" in text or "عکس جدول" in text) and "شرایط نامساعد کار" in text:
+        # پاسخ به درخواست جدول
+        if is_image_table_request(text):
             caption = "**منبع:** جدول امتیازات شرایط نامساعد کار — صفحهٔ 55"
             if send_table_image(chat_id, caption):
                 requests.post(f"{BASE_URL}/sendMessage", json={
@@ -180,11 +185,11 @@ def webhook():
                 })
                 return jsonify({"ok": True})
 
-        # پاسخ متنی
+        # پاسخ به سایر سوالات
         questions = load_questions()
         matches = find_matches(text, questions)
         answer = make_answer(matches)
-        
+
         requests.post(f"{BASE_URL}/sendMessage", json={
             "chat_id": chat_id,
             "text": answer,
@@ -196,13 +201,11 @@ def webhook():
         print(f"❌ خطا در webhook: {e}")
         return jsonify({"ok": False})
 
-# ─── صفحه سلامت (برای Render health check) ───────────────
+# ─── صفحه سلامت (برای Render) ──────────────────────────────────────
 @app.route('/health')
 def health():
-    return jsonify({"status": "ok", "bot": "AIHR40bot", "ready": True})
+    return jsonify({"status": "ok", "bot": "@AIHR40bot", "ready": True})
 
-# ─── اجرای آزمایشی در لوکال (اختیاری) ─────────────────────
+# ─── اجرای سرور (فقط برای تست محلی) ────────────────────────────────
 if __name__ == '__main__':
-    print("✅ ربات @AIHR40bot آماده است (حالت webhook).")
-    print("📌 برای استقرار در Render، فقط از `gunicorn` استفاده کنید.")
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8000)))

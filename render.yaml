@@ -9,5 +9,5 @@ services:
     envVars:
       - key: BOT_TOKEN
         sync: false
-        value: "1820733597:aCi2zuJ6nHm38iK71HxZyzPXOlQ1Jd55fgY"  # ⚠️ بعداً در Render امن کنید
+        value: "1820733597:aCi2zuJ6nHm38iK71HxZyzPXOlQ1Jd55fgY"  # ⚠️ بعداً اینجا را حذف کنید!
     healthCheckPath: /health
