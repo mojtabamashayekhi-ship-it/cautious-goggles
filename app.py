@@ -58,7 +58,7 @@ def send_message(chat_id, text):
         print("❌ Failed to send message:", e)
         return {"error": str(e)}
 
-# 🏁 راه‌اندازی سرور
+# 🏁 راه‌اندازی سرور — حتماً host و port را مشخص کنید!
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 5000))  # پورت را از متغیر محیطی بخوانید
+    app.run(host='0.0.0.0', port=port)       # به تمام آدرس‌ها bind کنید
