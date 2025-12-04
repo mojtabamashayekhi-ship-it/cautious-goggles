@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify
-import requests
+import os
 import json
+import requests
 
 # 🔑 توکن ربات بله (وارد شده به صورت مستقیم — فقط برای تست)
 BOT_TOKEN = "1820733597:aCi2zuJ6nHm38iK71HxZyzPXOlQ1Jd55fgY"
-WEBHOOK_URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}"
 
+# ایجاد نمونه Flask
 app = Flask(__name__)
 
 # ✅ Route برای بررسی سلامت سرویس (تست در مرورگر)
@@ -42,7 +43,7 @@ def webhook():
 
 # 📤 تابع ارسال پیام به بله
 def send_message(chat_id, text):
-    url = f"{WEBHOOK_URL}/sendMessage"
+    url = f"https://tapi.bale.ai/bot{BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
@@ -59,5 +60,5 @@ def send_message(chat_id, text):
 
 # 🏁 راه‌اندازی سرور
 if __name__ == '__main__':
-    port = int(__import__('os').environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
